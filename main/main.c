@@ -53,14 +53,12 @@ int pin_state(int data[]) {
     return 1;
 }
 
-bool flag = 0;
 //callback func for timer
 //it tracks when TX of the uart finished writing
 void timer_callback(void *arg) {
     // TaskHandle_t LED_task_handle;
     // xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, &LED_task_handle);
     // vTaskDelete(LED_task_handle);
-    // esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, 0);
 
     int data[DATA_LENGTH];
     int data_idx = 0;
@@ -69,11 +67,10 @@ void timer_callback(void *arg) {
         if(data_idx == DATA_LENGTH) {
             data_idx = 0;
             if(pin_state(data)) {
-                flag = 1;
+                esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, 0);
                 break;
             }
         }
-        vTaskDelay(BYTE_LENGTH*10);
     }
 }
 
@@ -86,16 +83,13 @@ void main_task(void *pvParameters) {
         .dispatch_method = ESP_TIMER_ISR
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_config, &timer_handle));
-    char package[64];
+    char package[2];
     while(1) {
         //tick timer before writing the package
         //than write the package
         //timer will tick when astimated package sending time ends
         esp_timer_start_once(timer_handle, BYTE_LENGTH);
         uart_write_bytes(UART_NUM, package, sizeof(package));
-        if(flag) {
-            ESP_LOGI("tag", "WORKS!");
-        }
         vTaskDelay(100);
     }
 }
