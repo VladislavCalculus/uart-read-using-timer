@@ -23,6 +23,9 @@ const uint32_t RX_NUM = 17;
 //calculating byte lenght in time
 const int BYTE_LENGTH = 1000000 / BOOTRATE * 10;
 
+//handler for LED task
+TaskHandle_t LED_task_handle;
+
 void uart_init();
 void main_task(void *pvParameters);
 void blink_LED_task(void *pvParameters);
@@ -56,22 +59,28 @@ int pin_state(int data[]) {
 //callback func for timer
 //it tracks when TX of the uart finished writing
 void timer_callback(void *arg) {
-    // TaskHandle_t LED_task_handle;
-    // xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, &LED_task_handle);
-    // vTaskDelete(LED_task_handle);
-
+    xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, &LED_task_handle);
     int data[DATA_LENGTH];
     int data_idx = 0;
+
+    //this loop is monitoring the TX pin state
     while(1) {
-        data[data_idx++] = gpio_get_level(TX_NUM);
+        //it writes level in data
+        data[data_idx++] = gpio_get_level(RX_NUM);
+
         if(data_idx == DATA_LENGTH) {
             data_idx = 0;
+
+            //when level in lenght of data isn`t changing
+            //pin is not beeing written
             if(pin_state(data)) {
+                //then we execute needed code
                 esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, 0);
                 break;
             }
         }
     }
+    gpio_set_level(GPIO_NUM, 0);
 }
 
 void main_task(void *pvParameters) {
@@ -83,14 +92,15 @@ void main_task(void *pvParameters) {
         .dispatch_method = ESP_TIMER_ISR
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_config, &timer_handle));
-    char package[2];
+    char package[32];
     while(1) {
         //tick timer before writing the package
         //than write the package
         //timer will tick when astimated package sending time ends
-        esp_timer_start_once(timer_handle, BYTE_LENGTH);
+        esp_timer_start_once(timer_handle, BYTE_LENGTH * sizeof(package));
         uart_write_bytes(UART_NUM, package, sizeof(package));
         vTaskDelay(100);
+        vTaskDelete(LED_task_handle);
     }
 }
 
