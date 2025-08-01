@@ -26,7 +26,7 @@ void blink_LED_task(void *pvParameters);
 void app_main(void)
 {   
     uart_init();
-    xTaskCreate(main_task, "task", 1024, NULL, 1, NULL);
+    xTaskCreate(main_task, "main task", 1024, NULL, 1, NULL);
 }
 
 void uart_init() {
@@ -35,6 +35,8 @@ void uart_init() {
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, uart_buffer_size, 10, &uart_queue, 0));
     //TX RX RTS CTS
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, 16, 17, 18, 19));
+
+    gpio_set_direction(GPIO_NUM, GPIO_MODE_OUTPUT);
 }
 
 //callback func for timer
@@ -52,7 +54,7 @@ void main_task(void *pvParameters) {
         .dispatch_method = ESP_TIMER_ISR
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_config, &timer_handle));
-
+    xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, NULL);
     char package[64];
     while(1) {
         //tick timer before writing the package
@@ -60,6 +62,7 @@ void main_task(void *pvParameters) {
         //timer will tick when astimated package sending time ends
         esp_timer_start_once(timer_handle, BYTE_LENGTH);
         uart_write_bytes(UART_NUM, package, sizeof(package));
+        
         vTaskDelay(100);
     }
 }
