@@ -85,10 +85,11 @@ void timer_callback(void *arg) {
 
     //--------
     //here should be code that will be executed as reading end
-    //code below can be deleted, it is for visual representation
+    //code below can be deleted
     timer_finish_read = esp_timer_get_time();
     timer_print_end = 1; 
     gpio_set_level(GPIO_NUM, 0);
+    esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, 0);
     //---------
 }
 
@@ -118,7 +119,7 @@ void main_task(void *pvParameters) {
         //requires eso_timer_handle_t and time in ms 
         esp_timer_start_once(timer_handle, BYTE_LENGTH*sizeof(package));
         //----------
-        
+
         int64_t timer_start_time = esp_timer_get_time();
         uart_write_bytes(UART_NUM, package, sizeof(package));
         gpio_set_level(GPIO_NUM, 0);
