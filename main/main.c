@@ -12,6 +12,7 @@
 
 
 #define BOOTRATE 155000
+#define DATA_LENGTH 10
 
 //uart and pins for this project
 const uart_port_t UART_NUM = UART_NUM_2;
@@ -42,14 +43,38 @@ void uart_init() {
     gpio_set_direction(GPIO_NUM, GPIO_MODE_OUTPUT);
 }
 
+//0 - being written in, 1 - waiting
+int pin_state(int data[]) {
+    for(int i = 0; i < DATA_LENGTH-1; i++) {
+        if(data[i] != data[i+1]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+bool flag = 0;
 //callback func for timer
 //it tracks when TX of the uart finished writing
 void timer_callback(void *arg) {
     // TaskHandle_t LED_task_handle;
     // xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, &LED_task_handle);
     // vTaskDelete(LED_task_handle);
-    esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, false);
+    // esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, 0);
 
+    int data[DATA_LENGTH];
+    int data_idx = 0;
+    while(1) {
+        data[data_idx++] = gpio_get_level(TX_NUM);
+        if(data_idx == DATA_LENGTH) {
+            data_idx = 0;
+            if(pin_state(data)) {
+                flag = 1;
+                break;
+            }
+        }
+        vTaskDelay(BYTE_LENGTH*10);
+    }
 }
 
 void main_task(void *pvParameters) {
@@ -68,7 +93,9 @@ void main_task(void *pvParameters) {
         //timer will tick when astimated package sending time ends
         esp_timer_start_once(timer_handle, BYTE_LENGTH);
         uart_write_bytes(UART_NUM, package, sizeof(package));
-        
+        if(flag) {
+            ESP_LOGI("tag", "WORKS!");
+        }
         vTaskDelay(100);
     }
 }
