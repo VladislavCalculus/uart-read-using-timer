@@ -9,16 +9,19 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
+
 #define BOOTRATE 155000
 
-//uart port for this project
-uart_port_t UART_NUM = UART_NUM_2;
+//uart and prio pin for this project
+const uart_port_t UART_NUM = UART_NUM_2;
+const gpio_num_t GPIO_NUM = GPIO_NUM_4;
 
 //calculating byte lenght in time
-int BYTE_LENGTH = 1000000 / BOOTRATE * 10;
+const int BYTE_LENGTH = 1000000 / BOOTRATE * 10;
 
 void uart_init();
 void main_task(void *pvParameters);
+void blink_LED_task(void *pvParameters);
 
 void app_main(void)
 {   
@@ -58,5 +61,14 @@ void main_task(void *pvParameters) {
         esp_timer_start_once(timer_handle, BYTE_LENGTH);
         uart_write_bytes(UART_NUM, package, sizeof(package));
         vTaskDelay(100);
+    }
+}
+
+void blink_LED_task(void *pvParameters) {
+    while(1) {
+        gpio_set_level(GPIO_NUM, 1);
+        vTaskDelay(BYTE_LENGTH);
+        gpio_set_level(GPIO_NUM, 0);
+        vTaskDelay(BYTE_LENGTH);
     }
 }
