@@ -20,11 +20,12 @@ const gpio_num_t GPIO_NUM = GPIO_NUM_4;
 const uint32_t TX_NUM = 16;
 const uint32_t RX_NUM = 17;
 
+//uart_num_2 queue
+QueueHandle_t uart_queue;
+
+
 //calculating byte lenght in time
 const int BYTE_LENGTH = 1000000 / BOOTRATE * 10;
-
-//handler for LED task
-TaskHandle_t LED_task_handle;
 
 void uart_init();
 void main_task(void *pvParameters);
@@ -33,12 +34,11 @@ void blink_LED_task(void *pvParameters);
 void app_main(void)
 {   
     uart_init();
-    xTaskCreate(main_task, "main task", 1024, NULL, 1, NULL);
+    xTaskCreate(main_task, "main task", 4096, NULL, 1, NULL);
 }
 
 void uart_init() {
     const int uart_buffer_size = (1024 * 2);
-    QueueHandle_t uart_queue;
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, uart_buffer_size, 10, &uart_queue, 0));
     //TX RX RTS CTS
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, TX_NUM, RX_NUM, 18, 19));
@@ -56,17 +56,18 @@ int pin_state(int data[]) {
     return 1;
 }
 
+int timer_print_end = 0;
 //callback func for timer
 //it tracks when TX of the uart finished writing
 void timer_callback(void *arg) {
-    xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, &LED_task_handle);
     int data[DATA_LENGTH];
     int data_idx = 0;
+    gpio_set_level(GPIO_NUM, 1);
 
     //this loop is monitoring the TX pin state
     while(1) {
         //it writes level in data
-        data[data_idx++] = gpio_get_level(RX_NUM);
+        data[data_idx++] = gpio_get_level(TX_NUM);
 
         if(data_idx == DATA_LENGTH) {
             data_idx = 0;
@@ -75,10 +76,15 @@ void timer_callback(void *arg) {
             //pin is not beeing written
             if(pin_state(data)) {
                 //then we execute needed code
+                // xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, NULL);
                 esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, 0);
-                break;
+                timer_print_end = 1;
+                gpio_set_level(GPIO_NUM, 0);
+                return;
             }
         }
+
+        vTaskDelay(1);
     }
     gpio_set_level(GPIO_NUM, 0);
 }
@@ -97,10 +103,15 @@ void main_task(void *pvParameters) {
         //tick timer before writing the package
         //than write the package
         //timer will tick when astimated package sending time ends
-        esp_timer_start_once(timer_handle, BYTE_LENGTH * sizeof(package));
+        esp_timer_start_once(timer_handle, BYTE_LENGTH);
         uart_write_bytes(UART_NUM, package, sizeof(package));
+        ESP_LOGI("package", "send");
+        if(timer_print_end) {
+            timer_print_end = 0;
+            ESP_LOGI("package", "ended");
+        }
         vTaskDelay(100);
-        vTaskDelete(LED_task_handle);
+        // gpio_set_level(GPIO_NUM, 0);
     }
 }
 
@@ -108,7 +119,6 @@ void blink_LED_task(void *pvParameters) {
     while(1) {
         gpio_set_level(GPIO_NUM, 1);
         vTaskDelay(BYTE_LENGTH);
-        gpio_set_level(GPIO_NUM, 0);
-        vTaskDelay(BYTE_LENGTH);
+        vTaskDelete(NULL);
     }
 }
