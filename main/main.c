@@ -9,7 +9,7 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "soc/gpio_sig_map.h"
-
+#include "rom/ets_sys.h"
 
 #define BOOTRATE 155000
 #define DATA_LENGTH 10
@@ -25,7 +25,8 @@ QueueHandle_t uart_queue;
 
 
 //calculating byte lenght in time
-const int BYTE_LENGTH = 1000000 / BOOTRATE * 10;
+const int BIT_LENGTH = 1000000 / BOOTRATE;
+const int BYTE_LENGTH = BIT_LENGTH * 10;
 
 void uart_init();
 void main_task(void *pvParameters);
@@ -60,32 +61,17 @@ int timer_print_end = 0;
 //callback func for timer
 //it tracks when TX of the uart finished writing
 void timer_callback(void *arg) {
-    int data[DATA_LENGTH];
-    int data_idx = 0;
+    int last_pin = NULL;
+    int curr_pin = NULL;
     gpio_set_level(GPIO_NUM, 1);
 
     //this loop is monitoring the TX pin state
     while(1) {
-        //it writes level in data
-        data[data_idx++] = gpio_get_level(TX_NUM);
+        curr_pin = gpio_get_level(TX_NUM);
 
-        if(data_idx == DATA_LENGTH) {
-            data_idx = 0;
-
-            //when level in lenght of data isn`t changing
-            //pin is not beeing written
-            if(pin_state(data)) {
-                //then we execute needed code
-                // xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, NULL);
-                esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, 0);
-                timer_print_end = 1;
-                gpio_set_level(GPIO_NUM, 0);
-                return;
-            }
-        }
-
-        vTaskDelay(1);
+        ets_delay_us(BIT_LENGTH);
     }
+
     gpio_set_level(GPIO_NUM, 0);
 }
 
