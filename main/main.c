@@ -84,7 +84,7 @@ void timer_callback(void *arg) {
     }
 
     //--------
-    //here should be code that will be executed as reading end
+    //here should be code that will be executed as reading ends
     //code below can be deleted
     timer_finish_read = esp_timer_get_time();
     timer_print_end = 1; 
@@ -116,7 +116,7 @@ void main_task(void *pvParameters) {
         
         //----------
         //starting the timer
-        //requires eso_timer_handle_t and time in ms 
+        //requires eso_timer_handle_t and time in microseconds 
         esp_timer_start_once(timer_handle, BYTE_LENGTH*sizeof(package));
         //----------
 
