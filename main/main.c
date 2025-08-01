@@ -8,13 +8,16 @@
 #include <esp_err.h>
 #include "driver/gpio.h"
 #include "esp_timer.h"
+#include "soc/gpio_sig_map.h"
 
 
 #define BOOTRATE 155000
 
-//uart and prio pin for this project
+//uart and pins for this project
 const uart_port_t UART_NUM = UART_NUM_2;
 const gpio_num_t GPIO_NUM = GPIO_NUM_4;
+const uint32_t TX_NUM = 16;
+const uint32_t RX_NUM = 17;
 
 //calculating byte lenght in time
 const int BYTE_LENGTH = 1000000 / BOOTRATE * 10;
@@ -34,7 +37,7 @@ void uart_init() {
     QueueHandle_t uart_queue;
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, uart_buffer_size, 10, &uart_queue, 0));
     //TX RX RTS CTS
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, 16, 17, 18, 19));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, TX_NUM, RX_NUM, 18, 19));
 
     gpio_set_direction(GPIO_NUM, GPIO_MODE_OUTPUT);
 }
@@ -42,6 +45,10 @@ void uart_init() {
 //callback func for timer
 //it tracks when TX of the uart finished writing
 void timer_callback(void *arg) {
+    // TaskHandle_t LED_task_handle;
+    // xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, &LED_task_handle);
+    // vTaskDelete(LED_task_handle);
+    esp_rom_gpio_connect_in_signal(RX_NUM, U2RXD_IN_IDX, false);
 
 }
 
@@ -54,7 +61,6 @@ void main_task(void *pvParameters) {
         .dispatch_method = ESP_TIMER_ISR
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_config, &timer_handle));
-    xTaskCreate(blink_LED_task, "blink LED task", 1024, NULL, 1, NULL);
     char package[64];
     while(1) {
         //tick timer before writing the package
