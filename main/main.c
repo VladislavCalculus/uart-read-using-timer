@@ -9,7 +9,13 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
+#define BOOTRATE 155000
+
+//uart port for this project
 uart_port_t UART_NUM = UART_NUM_2;
+
+//calculating byte lenght in time
+int BYTE_LENGTH = 1000000 / BOOTRATE * 10;
 
 void uart_init();
 void main_task(void *pvParameters);
@@ -24,23 +30,33 @@ void uart_init() {
     const int uart_buffer_size = (1024 * 2);
     QueueHandle_t uart_queue;
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, uart_buffer_size, 10, &uart_queue, 0));
+    //TX RX RTS CTS
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, 16, 17, 18, 19));
 }
 
+//callback func for timer
+//it tracks when TX of the uart finished writing
 void timer_callback(void *arg) {
-    
+
 }
 
 void main_task(void *pvParameters) {
     esp_timer_handle_t timer_handle;
     esp_timer_create_args_t timer_config = {
-        .callback = NULL,
+        .callback = &timer_callback,
         .arg = NULL,
         .name = "read TX",
         .dispatch_method = ESP_TIMER_ISR
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_config, &timer_handle));
 
+    char package[64];
     while(1) {
-        vTaskDelay(10);
+        //tick timer before writing the package
+        //than write the package
+        //timer will tick when astimated package sending time ends
+        esp_timer_start_once(timer_handle, BYTE_LENGTH);
+        uart_write_bytes(UART_NUM, package, sizeof(package));
+        vTaskDelay(100);
     }
 }
